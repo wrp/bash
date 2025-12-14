@@ -232,6 +232,8 @@ static char **prog_complete_matches;
 extern int no_symbolic_links;
 extern STRING_INT_ALIST word_token_alist[];
 extern sh_timer *read_timeout;
+extern char *current_readline_prompt;
+extern char **prompt_string_pointer;
 
 /* SPECIFIC_COMPLETION_FUNCTIONS specifies that we have individual
    completion functions which indicate what type of completion should be
@@ -985,33 +987,33 @@ edit_and_execute_command (int count, int c, int editing_mode, const char *edit_c
   rl_clear_signals ();
   save_parser_state (&ps);
   r = parse_and_execute (command, (editing_mode == VI_EDITING_MODE) ? "v" : "C-xC-e", SEVAL_NOHIST);
-  restore_parser_state (&ps);
-
-  /* if some kind of reset_parser was called, undo it. */
+  flush_parser_state (&ps);
+  reset_parser ();
   reset_readahead_token ();
+  clear_shell_input_line ();
+  prompt_string_pointer = (char **)NULL;
+  FREE (current_readline_prompt);
+  current_readline_prompt = (char *)NULL;
 
   if (rl_prep_term_function)
     (*rl_prep_term_function) (metaflag);
   rl_set_signals ();
 
-  current_command_line_count = saved_command_line_count;
+  current_command_line_count = 0;
 
   /* Now erase the contents of the current line and undo the effects of the
      rl_accept_line() above.  We don't even want to make the text we just
      executed available for undoing. */
   rl_line_buffer[0] = '\0';	/* XXX */
   rl_point = rl_end = 0;
-  rl_done = 0;
-  rl_readline_state = rrs;
+  rl_done = 1;
 
 #if defined (VI_MODE)
   if (editing_mode == VI_EDITING_MODE)
     rl_vi_insertion_mode (1, c);
 #endif
 
-  rl_forced_update_display ();
-
-  return r;
+  jump_to_top_level (DISCARD);
 }
 
 #if defined (VI_MODE)
